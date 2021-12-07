@@ -5,7 +5,7 @@ import java.util.*;
 public class OneHundredsServer {
     public static void main(String[] args) throws IOException {
 //        String guess = "Hello";
-        int portNumber = 8009;
+        int portNumber = 8010;
         String player1 = "";
         int incorrectCount = 0;
         String underscores = "_"; // variable that holds underscores to represent letters in the word
@@ -15,6 +15,11 @@ public class OneHundredsServer {
                 Socket clientSocket = serverSocket.accept();
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+
+                OutputStream outputStream = clientSocket.getOutputStream();
+                ObjectOutputStream objectOutput = new ObjectOutputStream(outputStream);
+                InputStream inputStream = clientSocket.getInputStream();
+                ObjectInputStream objectInput = new ObjectInputStream(inputStream);
         ){
             String inputLine, outputLine;
 
@@ -54,25 +59,32 @@ public class OneHundredsServer {
 
 //            cardDeck.ShuffleDeck(deck, getNumberOfShuffles(inputDevice));
             cardDeck.ShuffleDeck(deck, 5);
+
+            objectOutput.writeObject(players.get(0));
             int numberOfRoundsToPlay = deck.size() / players.size();
 
-            dealCards(cardDeck, deck, players);
-            playOneHundreds(numberOfRoundsToPlay, players, scores, in, out);
+            dealCards(cardDeck, deck, players, objectInput, objectOutput);
+            playOneHundreds(numberOfRoundsToPlay, players, scores, in, out, objectInput, objectOutput);
 
-            System.out.println("=== End of Game ===");
+            //System.out.println("=== End of Game ===");
+            outputLine = "=== End of Game ===";
+            out.println(outputLine);
+
             int winningScore = Collections.max(scores.values());
 
-            System.out.println("Scores: ");
+            //System.out.println("Scores: ");
+            outputLine = "Scores: ";
+            out.println(outputLine);
             ArrayList<String> winners = new ArrayList<>();
 
-            displayScores(scores);
+            displayScores(scores, out);
 
             determineWinners(winningScore, scores, winners);
 
-            displayWinners(scores, winners);
+            displayWinners(scores, winners, out);
 
-            displayRemainingCards(cardDeck, deck);
-        } catch (IOException e) {
+            displayRemainingCards(cardDeck, deck, out);
+        } catch (IOException | ClassNotFoundException e) {
             System.out.println("Exception caught when trying to listen on port "
                     + portNumber + " or listening for a connection");
             System.out.println(e.getMessage());
@@ -138,79 +150,117 @@ public class OneHundredsServer {
         return numberOfShuffles;
     }
 
-    public static void dealCards(CardDeck cardDeck, ArrayList<Card> deck, ArrayList<Player> players) {
+    public static void dealCards(CardDeck cardDeck, ArrayList<Card> deck, ArrayList<Player> players,
+                                 ObjectInputStream objectInput, ObjectOutputStream objectOutput) throws IOException {
         while ((cardDeck.CardsRemaining(deck) - players.size()) >= 0) {
+            int count = 0;
             for (Player player : players) {
-                LinkedList<Card> playerHand = player.getHand();
-                playerHand.add(deck.get(0));
+                if (count == 0){
+                    objectOutput.writeObject(deck.get(0));
+                } else {
+                    System.out.println(count + ". Card Value: " + deck.get(0).getValue() + " " + deck.get(0).getStatus());
+                    LinkedList<Card> playerHand = player.getHand();
+                    playerHand.add(deck.get(0));
+                }
                 deck.remove(0);
+                count++;
             }
         }
+        objectOutput.writeObject(null);
     }
 
     public static void playOneHundreds(int numberOfRoundsToPlay, ArrayList<Player> players, Map<String, Integer> scores,
-                                       BufferedReader in, PrintWriter out) throws IOException {
+                                       BufferedReader in, PrintWriter out, ObjectInputStream inputObject,
+                                       ObjectOutputStream objectOutput) throws IOException, ClassNotFoundException {
         ArrayList<Card> cardsPlayedInRound = new ArrayList<>();
         List<Card> wildCardsInRound = new ArrayList<>();
         int roundNumber = 1;
         String inputLine, outputLine;
-        while (roundNumber <= numberOfRoundsToPlay) {
-//            while ((inputLine = in.readLine()) != null) {
+        outputLine = "Press any key to begin!";
+        out.println(outputLine);
+        while ((roundNumber <= numberOfRoundsToPlay) && (in.readLine() != null)) {
 //                System.out.println("Round #" + roundNumber);
-                outputLine = "Round #" + roundNumber;
-                out.println(outputLine);
-                Card lowestValuedWildCard = null;
+            outputLine = "Round #" + roundNumber;
+            out.println(outputLine);
+            Card lowestValuedWildCard = null;
 
-                for (Player player : players) {
+            int count = 0;
+            for (Player player : players) {
+                if (count == 0) {
+//                    cardsPlayedInRound.add(player.getHand().get(0));
+                    Card playerCard = null;
+                    while ((playerCard = (Card) inputObject.readObject()) != null) {
+                        cardsPlayedInRound.add(playerCard);
+                        outputLine = player.getName() + ": " + playerCard.getValue() + " " +
+                                playerCard.getStatus();
+                        out.println(outputLine);
+                    }
+                } else {
                     cardsPlayedInRound.add(player.getHand().get(0));
-                    System.out.println(player.getName() + ": " + player.getHand().get(0).getValue() + " " + player.getHand().get(0).getStatus());
+                    outputLine = player.getName() + ": " + player.getHand().get(0).getValue() + " " +
+                            player.getHand().get(0).getStatus();
+                    out.println(outputLine);
+                    //System.out.println(player.getName() + ": " + player.getHand().get(0).getValue() + " " + player.getHand().get(0).getStatus());
                     player.getHand().remove(0);
                 }
-
-                for (Card card : cardsPlayedInRound) {
-                    if (card.getStatus().equals("w")) {
-                        wildCardsInRound.add(card);
-                    }
-                }
-
-                if (wildCardsInRound.size() > 0) {
-                    lowestValuedWildCard = wildCardsInRound.get(0);
-                    if (wildCardsInRound.size() > 1) {
-                        for (Card wildCard : wildCardsInRound) {
-                            if (wildCard.getValue() < lowestValuedWildCard.getValue()) {
-                                lowestValuedWildCard.setValue(wildCard.getValue());
-                            }
-                        }
-                    }
-                }
-
-                int winningPlayerIndex = 0;
-                if (lowestValuedWildCard == null) {
-                    Card highestCardInRound = cardsPlayedInRound.get(0);
-                    for (Card card : cardsPlayedInRound) {
-                        if (card.getValue() > highestCardInRound.getValue()) {
-                            highestCardInRound = card;
-                        }
-                    }
-                    winningPlayerIndex = cardsPlayedInRound.indexOf(highestCardInRound);
-                } else {
-                    winningPlayerIndex = cardsPlayedInRound.indexOf(lowestValuedWildCard);
-                }
-
-                String winningPlayerName = players.get(winningPlayerIndex).getName();
-                scores.put(winningPlayerName, scores.get(winningPlayerName) + 1);
-                System.out.println(winningPlayerName + " has won the hand\n");
-                roundNumber++;
-                // empty lists for next hand/round
-                cardsPlayedInRound.clear();
-                wildCardsInRound.clear();
+                count++;
             }
-//        }
+
+            for (Card card : cardsPlayedInRound) {
+                if (card.getStatus().equals("w")) {
+                    wildCardsInRound.add(card);
+                }
+            }
+
+            if (wildCardsInRound.size() > 0) {
+                lowestValuedWildCard = wildCardsInRound.get(0);
+                if (wildCardsInRound.size() > 1) {
+                    for (Card wildCard : wildCardsInRound) {
+                        if (wildCard.getValue() < lowestValuedWildCard.getValue()) {
+                            lowestValuedWildCard.setValue(wildCard.getValue());
+                        }
+                    }
+                }
+            }
+
+            int winningPlayerIndex = 0;
+            if (lowestValuedWildCard == null) {
+                Card highestCardInRound = cardsPlayedInRound.get(0);
+                for (Card card : cardsPlayedInRound) {
+                    if (card.getValue() > highestCardInRound.getValue()) {
+                        highestCardInRound = card;
+                    }
+                }
+                winningPlayerIndex = cardsPlayedInRound.indexOf(highestCardInRound);
+            } else {
+                winningPlayerIndex = cardsPlayedInRound.indexOf(lowestValuedWildCard);
+            }
+
+            String winningPlayerName = players.get(winningPlayerIndex).getName();
+            scores.put(winningPlayerName, scores.get(winningPlayerName) + 1);
+            outputLine = winningPlayerName + " has won the hand\n";
+            out.println(outputLine);
+            //System.out.println(winningPlayerName + " has won the hand\n");
+            roundNumber++;
+            // empty lists for next hand/round
+            cardsPlayedInRound.clear();
+            wildCardsInRound.clear();
+            outputLine = "Press any key to continue!";
+            out.println(outputLine);
+            if (roundNumber > numberOfRoundsToPlay) {
+                while (in.readLine() != null) {
+                    break;
+                }
+                break;
+            }
+        }
     }
 
-    public static void displayScores(Map<String, Integer> scores){
+    public static void displayScores(Map<String, Integer> scores, PrintWriter out){
         for (Map.Entry<String, Integer> entry : scores.entrySet()) {
-            System.out.println(entry.getKey() + " - " + entry.getValue());
+            //System.out.println(entry.getKey() + " - " + entry.getValue());
+            String outputLine = entry.getKey() + " - " + entry.getValue();
+            out.println(outputLine);
         }
     }
 
@@ -222,32 +272,44 @@ public class OneHundredsServer {
         }
     }
 
-    public static void displayWinners(Map<String, Integer> scores, ArrayList<String> winners){
+    public static void displayWinners(Map<String, Integer> scores, ArrayList<String> winners, PrintWriter out){
         if (winners.size() > 1){
-            System.out.println("\nWinners: ");
+            //System.out.println("\nWinners: ");
+            String outputLine = "\nWinners: ";
+            out.println(outputLine);
             int counter = 0;
             for (String winner: winners) {
                 if (counter != winners.size() - 1) {
-                    System.out.print(winner + ", ");
+                    //System.out.print(winner + ", ");
+                    outputLine += winner + ", ";
                 } else {
-                    System.out.print(winner + "\n");
+                    //System.out.print(winner + "\n");
+                    outputLine += winner;
                 }
                 counter++;
             }
+            out.println(outputLine);
         } else {
-            System.out.println("\nWinner: " + winners.get(0));
+            String outputLine = "\nWinner: " + winners.get(0);
+            out.println(outputLine);
+            //System.out.println("\nWinner: " + winners.get(0));
         }
 
-        System.out.println("Score: " + scores.get(winners.get(0)));
+        String outputLine = "Score: " + scores.get(winners.get(0));
+        out.println(outputLine);
+        //System.out.println("Score: " + scores.get(winners.get(0)));
     }
 
-    public static void displayRemainingCards(CardDeck cardDeck, ArrayList<Card> deck){
-        System.out.println("\nCards remaining in deck: ");
-
+    public static void displayRemainingCards(CardDeck cardDeck, ArrayList<Card> deck, PrintWriter out){
+        //System.out.println("\nCards remaining in deck: ");
+        String outputLine = "\nCards remaining in deck: ";
+        out.println(outputLine);
         if(cardDeck.CardsRemaining(deck) > 0) {
-            cardDeck.PrintDeck(deck);
+            cardDeck.PrintDeck(deck, out);
         } else {
-            System.out.println("None");
+            //System.out.println("None");
+            outputLine = "None";
+            out.println(outputLine);
         }
     }
 }

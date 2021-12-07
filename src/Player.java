@@ -1,7 +1,8 @@
+import java.io.Serializable;
 import java.util.List;
 import java.util.LinkedList;
 
-public class Player {
+public class Player implements Serializable {
     private String name;
     private LinkedList<Card> hand = new LinkedList<>();
 

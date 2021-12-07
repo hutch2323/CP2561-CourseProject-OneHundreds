@@ -1,3 +1,4 @@
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -11,7 +12,6 @@ public class CardDeck {
         ArrayList<Card> deck = new ArrayList<>();
         for(int i = 1; i <= 100; i++){
             Card card = new Card(i, "n");
-            //this.deck.add(card);
             deck.add(card);
         }
 
@@ -35,11 +35,13 @@ public class CardDeck {
         return deck;
     }
 
-    public void PrintDeck(ArrayList<Card> deck){
+    public void PrintDeck(ArrayList<Card> deck, PrintWriter out){
         ListIterator<Card> iterator = deck.listIterator();
 
         iterator.forEachRemaining((card) -> {
-           System.out.println(card.getValue() + " " + card.getStatus());
+           //System.out.println(card.getValue() + " " + card.getStatus());
+            String outputLine = card.getValue() + " " + card.getStatus();
+            out.println(outputLine);
         });
     }
 
