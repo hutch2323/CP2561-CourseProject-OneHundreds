@@ -189,7 +189,7 @@ public class OneHundreds {
         System.out.println("\nCards remaining in deck: ");
 
         if(cardDeck.CardsRemaining(deck) > 0) {
-            cardDeck.PrintDeck(deck);
+            //cardDeck.PrintDeck(deck);
         } else {
             System.out.println("None");
         }
