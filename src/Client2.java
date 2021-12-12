@@ -1,11 +1,11 @@
-import java.net.*;
 import java.io.*;
-import java.util.*;
+import java.net.*;
+import java.util.LinkedList;
 
-public class Client {
+public class Client2 {
     public static void main(String[] args) throws IOException {
         String hostName = "localhost";
-        int portNumber = 8020;
+        int portNumber = 8010;
         Player player = null;
 
         try (
@@ -19,21 +19,12 @@ public class Client {
                 InputStream inputStream = clientSocket.getInputStream();
                 ObjectInputStream objectInput = new ObjectInputStream(inputStream);
         ) {
-            String userInput = "", fromServer;
+            String userInput, fromServer;
             while ((fromServer = in.readLine()) != null) {
-                System.out.println("Server: " + fromServer);
-                if (fromServer.contains("Ready")) {
-                    break;
-                }
-            }
-
-            while ((fromServer = in.readLine()) != null) {
-                System.out.println("Server: " + fromServer);
                 if (fromServer.equals("Good")) {
-                    LinkedList<Card> hand = new LinkedList<>();
-                    player = new Player(userInput, hand);
                     break;
                 }
+                System.out.println("Server: " + fromServer);
 
                 userInput = stdIn.readLine();
                 if (userInput != null) {
@@ -42,24 +33,24 @@ public class Client {
                 }
             }
 
-            Card card = null;
-            while (player.getHand().size() < 25) {
-                try{
-                    card = (Card)objectInput.readObject();
-                    player.getHand().add(card);
-                    System.out.println("Dealt card (#" + player.getHand().size() +"): " + card.getValue() + " " + card.getStatus());
-                } catch (Exception e){
-                    continue;
+            while ((player = (Player)objectInput.readObject()) != null){
+                System.out.println("Player: " + player.getName());
+                Card card = null;
+                while ((card = (Card)objectInput.readObject()) != null) {
+                    LinkedList<Card> playerHand = player.getHand();
+                    playerHand.add(card);
+//                    System.out.println("Dealt card: " + card.getValue() + " " + card.getStatus());
                 }
+                break;
             }
 
             String playerHand = "";
             int count = 0;
-            for (Card currentCard : player.getHand()){
+            for (Card card : player.getHand()){
                 if (count != player.getHand().size() - 1){
-                    playerHand += currentCard.getValue() + " " + currentCard.getStatus() + ", ";
+                    playerHand += card.getValue() + " " + card.getStatus() + ", ";
                 } else {
-                    playerHand += currentCard.getValue() + " " + currentCard.getStatus();
+                    playerHand += card.getValue() + " " + card.getStatus();
                 }
                 count++;
             }
@@ -68,8 +59,10 @@ public class Client {
             while ((fromServer = in.readLine()) != null){
                 System.out.println(fromServer);
                 if (fromServer.contains("Round")){
-                    card = player.getHand().get(0);
+                    //System.out.println(player.getName() + ": " + player.getHand().get(0).getValue() + " " + player.getHand().get(0).getStatus());
+                    Card card = player.getHand().get(0);
                     player.getHand().remove(0);
+//                    System.out.println("User Card: " + card.getValue() + " " + card.getStatus());
                     objectOutput.writeObject(card);
                     objectOutput.writeObject(null);
                 } else if (fromServer.contains("any key")){
@@ -77,16 +70,15 @@ public class Client {
                     out.println(userInput);
                 }
             }
-
-
-
         } catch (UnknownHostException e) {
             System.err.println("Unable to find host " + hostName);
             System.exit(1);
-        } catch (IOException e) {
-            e.printStackTrace(System.out);
+        } catch (IOException | ClassNotFoundException e) {
             System.err.println("Unable to retrieve I/O for connection to " + hostName);
             System.exit(1);
         }
+//        } catch (ClassNotFoundException e) {
+//            e.printStackTrace();
+//        }
     }
 }

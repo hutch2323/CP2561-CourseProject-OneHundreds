@@ -34,4 +34,5 @@ public class Player implements Serializable {
             System.out.println("Status: " + card.getStatus() + "\n");
         }
     }
+
 }
