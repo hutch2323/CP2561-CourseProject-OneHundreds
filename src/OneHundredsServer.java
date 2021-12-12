@@ -4,11 +4,8 @@ import java.util.*;
 
 public class OneHundredsServer {
     public static void main(String[] args) throws IOException {
-//        String guess = "Hello";
         int portNumber = 8010;
         String player1 = "";
-        int incorrectCount = 0;
-        String underscores = "_"; // variable that holds underscores to represent letters in the word
 
         try (
                 ServerSocket serverSocket = new ServerSocket(portNumber);
